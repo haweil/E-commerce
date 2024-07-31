@@ -31,6 +31,10 @@ class ProductResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
 
+    protected static ?int $navigationSort = 4;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -41,16 +45,16 @@ class ProductResource extends Resource
                             ->required()
                             ->live(onBlur: true)
                             ->maxLength(255)
-                            ->afterStateUpdated(fn (string $operation , $state , Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
+                            ->afterStateUpdated(fn (string $operation, $state, Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
                         TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
                             ->disabled()
                             ->dehydrated()
                             ->unique(Product::class, 'slug', ignoreRecord: true),
-                    MarkdownEditor::make('description')
-                        ->columnSpanFull()
-                        ->fileAttachmentsDirectory('products'),
+                        MarkdownEditor::make('description')
+                            ->columnSpanFull()
+                            ->fileAttachmentsDirectory('products'),
                     ])->columns(2),
                     Section::make('Images')->schema([
                         FileUpload::make('images')
@@ -74,7 +78,7 @@ class ProductResource extends Resource
                             ->preload()
                             ->relationship('category', 'name'),
 
-                            Select::make('brand_id')
+                        Select::make('brand_id')
                             ->required()
                             ->searchable()
                             ->preload()
@@ -138,7 +142,7 @@ class ProductResource extends Resource
                 SelectFilter::make('category')
                     ->relationship('category', 'name')
                     ->indicator('Category'),
-                 SelectFilter::make('brand')
+                SelectFilter::make('brand')
                     ->relationship('brand', 'name')
                     ->indicator('brand'),
             ])

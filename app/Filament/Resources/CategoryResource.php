@@ -26,6 +26,12 @@ class CategoryResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
+    // protected static ?int $navigationSort = 3;
+
+    // protected static ?string $recordTitleAttribute = 'name';
+
+
+
     public static function form(Form $form): Form
     {
         return $form
@@ -33,28 +39,28 @@ class CategoryResource extends Resource
                 Section::make([
                     Grid::make()
                         ->schema([
-                                TextInput::make('name')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(fn (string $operation , $state , Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
-                                TextInput::make('slug')
-                                    ->required()
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->maxLength(255)
-                                    ->unique(Category::class, 'slug', ignoreRecord: true)
+                            TextInput::make('name')
+                                ->required()
+                                ->maxLength(255)
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (string $operation, $state, Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
+                            TextInput::make('slug')
+                                ->required()
+                                ->disabled()
+                                ->dehydrated()
+                                ->maxLength(255)
+                                ->unique(Category::class, 'slug', ignoreRecord: true)
                         ]),
 
-                        FileUpload::make('image')
+                    FileUpload::make('image')
                         ->image()
                         ->directory('categories'),
 
-                        Toggle::make('is_active')
+                    Toggle::make('is_active')
                         ->required()
                         ->default(true),
-                        ])
-                ]);
+                ])
+            ]);
     }
 
     public static function table(Table $table): Table

@@ -26,6 +26,12 @@ class BrandResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-computer-desktop';
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?int $navigationSort = 2;
+
+
+
     public static function form(Form $form): Form
     {
         return $form
@@ -33,28 +39,28 @@ class BrandResource extends Resource
                 Section::make([
                     Grid::make()
                         ->schema([
-                                TextInput::make('name')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(fn (string $operation , $state , Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
-                                TextInput::make('slug')
-                                    ->required()
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->maxLength(255)
-                                    ->unique(Brand::class, 'slug', ignoreRecord: true)
+                            TextInput::make('name')
+                                ->required()
+                                ->maxLength(255)
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (string $operation, $state, Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
+                            TextInput::make('slug')
+                                ->required()
+                                ->disabled()
+                                ->dehydrated()
+                                ->maxLength(255)
+                                ->unique(Brand::class, 'slug', ignoreRecord: true)
                         ]),
 
-                        FileUpload::make('logo')
+                    FileUpload::make('logo')
                         ->image()
                         ->directory('brands'),
 
-                        Toggle::make('is_active')
+                    Toggle::make('is_active')
                         ->required()
                         ->default(true),
-                        ])
-                ]);
+                ])
+            ]);
     }
 
     public static function table(Table $table): Table
@@ -84,7 +90,7 @@ class BrandResource extends Resource
             ->filters([
                 //
             ])
-           ->actions([
+            ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
