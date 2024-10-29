@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,7 +44,7 @@ class BrandResource extends Resource
                                 ->required()
                                 ->maxLength(255)
                                 ->live(onBlur: true)
-                                ->afterStateUpdated(fn (string $operation, $state, Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
+                                ->afterStateUpdated(fn(string $operation, $state, Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
                             TextInput::make('slug')
                                 ->required()
                                 ->disabled()
@@ -51,7 +52,21 @@ class BrandResource extends Resource
                                 ->maxLength(255)
                                 ->unique(Brand::class, 'slug', ignoreRecord: true)
                         ]),
-
+                    Repeater::make('translations')
+                        ->relationship()
+                        ->schema([
+                            TextInput::make('locale')
+                                ->required()
+                                ->label('Locale'),
+                            TextInput::make('name')
+                                ->required()
+                                ->label('name'),
+                        ])
+                        ->columns(2)
+                        ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                            // Perform any data transformation before saving if needed
+                            return $data;
+                        }),
                     FileUpload::make('logo')
                         ->image()
                         ->directory('brands'),

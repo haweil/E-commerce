@@ -18,6 +18,7 @@ use App\Filament\Resources\UserResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Filament\Resources\UserResource\RelationManagers\OrdersRelationManager;
+use Filament\Forms\Components\Select;
 
 class UserResource extends Resource
 {
@@ -46,8 +47,15 @@ class UserResource extends Resource
                     ->default(now()),
                 TextInput::make('password')
                     ->password()
-                    ->dehydrated(fn ($state) => filled($state))
-                    ->required(fn (Page $livewire): bool => $livewire instanceof CreateRecord),
+                    ->dehydrated(fn($state) => filled($state))
+                    ->required(fn(Page $livewire): bool => $livewire instanceof CreateRecord),
+                Select::make('is_admin')
+                    ->options([
+                        0 => 'No',
+                        1 => 'Yes',
+                    ])
+                    ->default(0)
+                    ->required(),
             ]);
     }
 

@@ -23,4 +23,17 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+    public function translations()
+    {
+        return $this->hasMany(CategoryTranslation::class);
+    }
+    public function CategoryTranslation(array $translations)
+    {
+        foreach ($translations as $translation) {
+            $this->translations()->create([
+                'locale' => $translation['locale'],
+                'name' => $translation['name']
+            ]);
+        }
+    }
 }

@@ -10,7 +10,9 @@ use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
+use App\Models\ShippingRate;
 use Illuminate\Support\Number;
+use App\Models\ProductVariation;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Hidden;
@@ -53,6 +55,7 @@ class OrderResource extends Resource
                         Select::make('payment_method')
                             ->options([
                                 'stripe' => 'Stripe',
+                                'paypal' => 'PayPal',
                                 'cod' => 'Cash On Delivery',
                             ])
                             ->required(),
@@ -99,14 +102,21 @@ class OrderResource extends Resource
                             ])
                             ->default('usd')
                             ->required(),
-                        Select::make('shipping_method')
-                            ->options([
-                                'Fedex' => 'Fedex',
-                                'dhl' => 'DHL',
-                                'usps' => 'USPS',
-                                'ups' => 'UPS',
-                                'other' => 'Other',
-                            ]),
+                        Select::make('shipping_rate_id')
+                            ->label('Shipping Method')
+                            ->options(ShippingRate::all()->pluck('name', 'id')->toArray())
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, $get, $set) {
+                                $shippingRate = ShippingRate::find($state);
+                                $set('shipping_amount', $shippingRate->price ?? 0);
+                            })
+                            ->required(),
+
+                        TextInput::make('shipping_amount')
+                            ->label('Shipping Amount')
+                            ->numeric()
+                            ->disabled()
+                            ->required(),
                         Textarea::make('notes')
                             ->columnSpanFull()
                     ])->columns(2),
@@ -122,11 +132,56 @@ class OrderResource extends Resource
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->distinct()
                                     ->required()
-                                    ->columnSpan(4)
+                                    ->columnSpan(3)
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Set $set) => $set('unit_amount', Product::find($state)->price))
-                                    ->afterStateUpdated(fn ($state, Set $set) => $set('total_amount', Product::find($state)->price)),
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        $product = Product::find($state);
+                                        if ($product) {
+                                            // If product has variations, don't set price yet
+                                            if ($product->variations()->count() > 0) {
+                                                $set('unit_amount', null);
+                                                $set('total_amount', null);
+                                            } else {
+                                                // If no variations, use base price
+                                                $set('unit_amount', $product->price);
+                                                $set('total_amount', $product->price);
+                                            }
+                                        }
+                                    }),
 
+                                Select::make('variation_id')
+                                    ->label('Size')
+                                    ->options(function (Get $get) {
+                                        $productId = $get('product_id');
+                                        if (!$productId) return [];
+
+                                        return ProductVariation::where('product_id', $productId)
+                                            ->get()
+                                            ->pluck('price', 'id')
+                                            ->map(function ($price, $id) use ($productId) {
+                                                $variation = ProductVariation::find($id);
+                                                return $variation->size . ' ($' . number_format($price, 2) . ')';
+                                            });
+                                    })
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if ($state) {
+                                            $variation = ProductVariation::find($state);
+                                            if ($variation) {
+                                                $set('unit_amount', $variation->price);
+                                                $set('total_amount', $variation->price);
+                                            }
+                                        }
+                                    })
+                                    ->visible(function (Get $get) {
+                                        $productId = $get('product_id');
+                                        if (!$productId) return false;
+
+                                        return Product::find($productId)
+                                            ->variations()
+                                            ->count() > 0;
+                                    })
+                                    ->columnSpan(3),
 
                                 TextInput::make('quantity')
                                     ->numeric()
@@ -135,21 +190,28 @@ class OrderResource extends Resource
                                     ->default(1)
                                     ->columnSpan(2)
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Set $set, Get $get) => $set('total_amount', $state * $get('unit_amount'))),
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        $unitAmount = $get('unit_amount');
+                                        if ($unitAmount) {
+                                            $set('total_amount', $state * $unitAmount);
+                                        }
+                                    }),
 
                                 TextInput::make('unit_amount')
                                     ->numeric()
                                     ->required()
                                     ->disabled()
                                     ->dehydrated()
-                                    ->columnSpan(3),
+                                    ->columnSpan(2),
+
                                 TextInput::make('total_amount')
                                     ->numeric()
                                     ->required()
                                     ->disabled()
                                     ->dehydrated()
-                                    ->columnSpan(3),
+                                    ->columnSpan(2),
                             ])->columns(12),
+
                         Placeholder::make('grand_total_placeholder')
                             ->label('Grand Total')
                             ->content(function (Get $get, Set $set) {

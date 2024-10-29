@@ -19,13 +19,20 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+
+
+        Schema::create('brand_translations', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('brand_id')->constrained()->cascadeOnDelete();
+            $table->string('locale')->index();
+            $table->string('name');
+            $table->unique(['brand_id', 'locale']);
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
+        Schema::dropIfExists('brand_translations');
         Schema::dropIfExists('brands');
     }
 };

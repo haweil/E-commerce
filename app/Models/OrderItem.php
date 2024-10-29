@@ -14,10 +14,16 @@ class OrderItem extends Model
         'product_id',
         'order_id',
         'quantity',
+        'variation_id',
+        'Size',
         'unit_amount',
         'total_amount',
     ];
 
+    public function variation()
+    {
+        return $this->belongsTo(ProductVariation::class);
+    }
     public function order()
     {
         return $this->belongsTo(Order::class);
