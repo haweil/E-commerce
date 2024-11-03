@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->foreignId('category_id')->constrained('categories')->casecadeOnDelete();
-            $table->foreignId('brand_id')->constrained('brands')->casecadeOnDelete();
             $table->string('slug')->unique();
             $table->string('sku');
             $table->json('images')->nullable();

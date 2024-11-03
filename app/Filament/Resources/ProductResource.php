@@ -121,12 +121,6 @@ class ProductResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('category', 'name'),
-
-                        Select::make('brand_id')
-                            ->required()
-                            ->searchable()
-                            ->preload()
-                            ->relationship('brand', 'name')
                     ]),
                     Section::make('Status')->schema([
                         Toggle::make('in_stock')
@@ -155,9 +149,6 @@ class ProductResource extends Resource
                     ->sortable(),
                 TextColumn::make('category.name')
                     ->searchable(),
-                TextColumn::make('brand.name')
-                    ->searchable()
-                    ->sortable(),
                 IconColumn::make('is_featured')
                     ->boolean(),
                 IconColumn::make('on_sale')
@@ -175,14 +166,14 @@ class ProductResource extends Resource
                         if ($record->base_price > 0) {
                             $html .= sprintf(
                                 '<div class="flex items-center gap-2">
-                                    <div class="px-2 py-1 bg-primary-50 rounded-md">
-                                        <span class="text-sm font-medium">Base Price:</span>
+                                    <div class=" bg-primary-50 rounded-md">
+                                        <span class="text-sm font-medium">Base Price</span>
                                         <span class="text-primary-600">$%s</span>
                                     </div>
                                     %s
                                 </div>',
                                 number_format($record->base_price, 2),
-                                $record->on_sale ? '<span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">On Sale</span>' : ''
+                                $record->on_sale ? '<span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded"></span>' : ''
                             );
                         }
 
@@ -216,9 +207,6 @@ class ProductResource extends Resource
                 SelectFilter::make('category')
                     ->relationship('category', 'name')
                     ->indicator('Category'),
-                SelectFilter::make('brand')
-                    ->relationship('brand', 'name')
-                    ->indicator('Brand'),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([

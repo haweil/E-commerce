@@ -102,21 +102,22 @@ class OrderResource extends Resource
                             ])
                             ->default('usd')
                             ->required(),
-                        Select::make('shipping_rate_id')
-                            ->label('Shipping Method')
-                            ->options(ShippingRate::all()->pluck('name', 'id')->toArray())
+                        Select::make('shipping_method')
+                            ->options(function () {
+                                return ShippingRate::all()->pluck('name', 'id')->toArray();
+                            })
+                            ->preload()
                             ->reactive()
                             ->afterStateUpdated(function ($state, $get, $set) {
                                 $shippingRate = ShippingRate::find($state);
                                 $set('shipping_amount', $shippingRate->price ?? 0);
                             })
                             ->required(),
-
                         TextInput::make('shipping_amount')
-                            ->label('Shipping Amount')
                             ->numeric()
                             ->disabled()
-                            ->required(),
+                            ->required()
+                            ->dehydrated(true),
                         Textarea::make('notes')
                             ->columnSpanFull()
                     ])->columns(2),
@@ -129,8 +130,6 @@ class OrderResource extends Resource
                                     ->relationship('product', 'name')
                                     ->searchable()
                                     ->preload()
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->distinct()
                                     ->required()
                                     ->columnSpan(3)
                                     ->reactive()
@@ -139,12 +138,12 @@ class OrderResource extends Resource
                                         if ($product) {
                                             // If product has variations, don't set price yet
                                             if ($product->variations()->count() > 0) {
-                                                $set('unit_amount', null);
-                                                $set('total_amount', null);
+                                                $set('unit_amount', $product->base_price);
+                                                $set('total_amount', $product->base_price);
                                             } else {
                                                 // If no variations, use base price
-                                                $set('unit_amount', $product->price);
-                                                $set('total_amount', $product->price);
+                                                $set('unit_amount', $product->base_price);
+                                                $set('total_amount', $product->base_price);
                                             }
                                         }
                                     }),
@@ -254,7 +253,7 @@ class OrderResource extends Resource
                 TextColumn::make('currency')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('shipping_method')
+                TextColumn::make('shipping_amount')
                     ->searchable()
                     ->sortable(),
                 SelectColumn::make('status')
