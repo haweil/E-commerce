@@ -1,13 +1,15 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\Order;
 
 use Stripe\Stripe;
 use App\Models\Order;
 use App\Models\Address;
 use App\Models\OrderItem;
+use App\Models\DiscountCode;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Stripe\Checkout\Session as CheckoutSession;
 
@@ -15,21 +17,42 @@ class OrderController extends Controller
 {
     public function StripeCheckout(Request $request)
     {
+
         $request->validate([
             'items' => 'required|array',
             'address' => 'required|array',
             'shipping_amount' => 'required|numeric',
+            'discount_code' => 'nullable|string',
         ]);
+
+        $subtotal = $this->calculateSubtotal($request->items);
+
+        $discountAmount = 0;
+        $appliedDiscount = null;
+
+        // Handle discount code if provided
+        if ($request->discount_code) {
+            $discount = DiscountCode::where('code', $request->discount_code)->first();
+
+            if ($discount && $discount->isValid() && $subtotal >= $discount->minimum_order_value) {
+                $discountAmount = $this->calculateDiscountAmount($subtotal, $discount);
+                $appliedDiscount = $discount;
+            }
+        }
+
+        // Calculate grand total after discount
+        $grandTotal = $subtotal + $request->shipping_amount - $discountAmount;
+        $grandTotalInCents = (int)($grandTotal * 100); // Convert to cents for Stripe
 
         $order = Order::create([
             'user_id' => Auth::id(),
-            'grand_total' => $this->calculateGrandTotal($request->items, $request->shipping_amount),
+            'grand_total' => $grandTotal,
             'payment_method' => 'stripe',
             'payment_status' => 'pending',
             'status' => 'new',
-            'currency' => 'EUR',
+            'currency' => 'eur',
             'shipping_amount' => $request->shipping_amount,
-            'shipping_method' => 'standard',
+            'shipping_method' => '1',
             'notes' => $request->notes ?? null,
         ]);
 
@@ -48,19 +71,41 @@ class OrderController extends Controller
 
         // Initialize Stripe
         Stripe::setApiKey(config('services.stripe.secret'));
-
         // Create Checkout Session
         $session = CheckoutSession::create([
             'payment_method_types' => ['card'],
-            'line_items' => $this->prepareLineItems($request->items),
+            'line_items' => $this->prepareLineItems($request->items, $grandTotal),
             'mode' => 'payment',
-            'success_url' => route('', ['order_id' => $order->id]),
+            'success_url' => route('order.success', ['order_id' => $order->id]),
             'cancel_url' => route('order.cancel'),
             'metadata' => ['order_id' => $order->id],
+            'shipping_options' => [
+                [
+                    'shipping_rate_data' => [
+                        'type' => 'fixed_amount',
+                        'fixed_amount' => [
+                            'amount' => $request->shipping_amount * 100,
+                            'currency' => 'eur',
+                        ],
+                        'display_name' => 'shipping',
+                        'delivery_estimate' => [
+                            'minimum' => [
+                                'unit' => 'business_day',
+                                'value' => 3,
+                            ],
+                            'maximum' => [
+                                'unit' => 'business_day',
+                                'value' => 5,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ]);
-        $order->update(['session_stripe_id' => $session->id]);
-
-        return response()->json(['id' => $session->id]);
+        $order->update([
+            'session_stripe_id' => $session->id,
+        ]);
+        return response()->json($session->url);
     }
 
     public function StripeCheckoutSuccess($order_id)
@@ -110,7 +155,7 @@ class OrderController extends Controller
         }
         return $total + $shippingAmount;
     }
-    private function prepareLineItems($items)
+    private function prepareLineItems($items, $grandTotal)
     {
         $lineItems = [];
         foreach ($items as $item) {
@@ -118,24 +163,37 @@ class OrderController extends Controller
                 'price_data' => [
                     'currency' => 'eur',
                     'product_data' => [
-                        'name' => $item['name'],
-                        'images' => [$item['image_url'] ?? ''],
+                        'name' => 'Order #' . $order->id,
+                        'description' => 'Total amount including shipping' . ($discountAmount > 0 ? ' and discount' : ''),
                     ],
-                    'unit_amount' => $item['unit_amount'] * 100,
+                    'unit_amount' => (int)($grandTotal * 100),
                 ],
-                'quantity' => $item['quantity'],
+                'quantity' => 1,
             ];
         }
         return $lineItems;
     }
     private function handleFailedPayment(Order $order)
     {
-        // If the payment failed, update the order status
         $order->update([
             'payment_status' => 'failed',
             'status' => 'cancelled',
         ]);
+    }
 
-        // For example, notify the user about the failed payment
+    private function calculateSubtotal($items)
+    {
+        return array_reduce($items, function ($carry, $item) {
+            return $carry + ($item['unit_amount'] * $item['quantity']);
+        }, 0);
+    }
+
+    private function calculateDiscountAmount($subtotal, DiscountCode $discount)
+    {
+        if ($discount->discount_percentage) {
+            return $subtotal * ($discount->discount_percentage / 100);
+        }
+
+        return min($discount->discount_amount, $subtotal);
     }
 }

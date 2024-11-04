@@ -22,6 +22,7 @@ class Order extends Model
         'shipping_amount',
         'shipping_method',
         'notes',
+        'session_stripe_id',
     ];
 
     public function user()

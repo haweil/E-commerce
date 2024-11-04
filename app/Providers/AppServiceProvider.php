@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
             Config::set('services.google.client_secret', $configuration->google_client_secret);
             Config::set('services.google.redirect', $configuration->google_redirect_uri);
             Config::set('services.stripe.key', $configuration->stripe_public_key);
-            Config::set('services.stripe.secret', $configuration->stripe_secret);
+            Config::set('services.stripe.secret', $configuration->stripe_secret_key);
         }
     }
 }
