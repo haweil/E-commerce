@@ -26,7 +26,9 @@ class User extends Authenticatable implements FilamentUser
         'email_verified_at',
         'password',
         'is_admin',
-        'google_id'
+        'google_id',
+        'reset_code',
+        'reset_code_expires_at'
     ];
 
     /**
@@ -58,5 +60,11 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->is_admin;
+    }
+    public function isResetCodeValid(string $code): bool
+    {
+        return $this->reset_code === $code &&
+            $this->reset_code_expires_at &&
+            now()->lt($this->reset_code_expires_at);
     }
 }

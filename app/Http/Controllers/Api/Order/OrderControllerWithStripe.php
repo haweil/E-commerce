@@ -13,7 +13,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Stripe\Checkout\Session as CheckoutSession;
 
-class OrderController extends Controller
+class OrderControllerWithStripe extends Controller
 {
     public function StripeCheckout(Request $request)
     {
@@ -24,25 +24,10 @@ class OrderController extends Controller
             'shipping_amount' => 'required|numeric',
             'discount_code' => 'nullable|string',
         ]);
-
         $subtotal = $this->calculateSubtotal($request->items);
+        $discountDetails = $this->handleDiscount($request->discount_code, $subtotal);
 
-        $discountAmount = 0;
-        $appliedDiscount = null;
-
-        // Handle discount code if provided
-        if ($request->discount_code) {
-            $discount = DiscountCode::where('code', $request->discount_code)->first();
-
-            if ($discount && $discount->isValid() && $subtotal >= $discount->minimum_order_value) {
-                $discountAmount = $this->calculateDiscountAmount($subtotal, $discount);
-                $appliedDiscount = $discount;
-            }
-        }
-
-        // Calculate grand total after discount
-        $grandTotal = $subtotal + $request->shipping_amount - $discountAmount;
-        $grandTotalInCents = (int)($grandTotal * 100); // Convert to cents for Stripe
+        $grandTotal = $subtotal + $request->shipping_amount - $discountDetails['amount'];
 
         $order = Order::create([
             'user_id' => Auth::id(),
@@ -72,36 +57,66 @@ class OrderController extends Controller
         // Initialize Stripe
         Stripe::setApiKey(config('services.stripe.secret'));
         // Create Checkout Session
-        $session = CheckoutSession::create([
+        $lineItems = $this->prepareLineItems($request->items);
+
+
+
+
+        $sessionParams = [
             'payment_method_types' => ['card'],
-            'line_items' => $this->prepareLineItems($request->items, $grandTotal),
-            'mode' => 'payment',
-            'success_url' => route('order.success', ['order_id' => $order->id]),
-            'cancel_url' => route('order.cancel'),
-            'metadata' => ['order_id' => $order->id],
+            'line_items' => $lineItems,
             'shipping_options' => [
                 [
                     'shipping_rate_data' => [
                         'type' => 'fixed_amount',
                         'fixed_amount' => [
-                            'amount' => $request->shipping_amount * 100,
+                            'amount' => (int)($request->shipping_amount * 100),
                             'currency' => 'eur',
                         ],
-                        'display_name' => 'shipping',
+                        'display_name' => 'Standard Shipping',
                         'delivery_estimate' => [
-                            'minimum' => [
-                                'unit' => 'business_day',
-                                'value' => 3,
-                            ],
-                            'maximum' => [
-                                'unit' => 'business_day',
-                                'value' => 5,
-                            ],
+                            'minimum' => ['unit' => 'business_day', 'value' => 3],
+                            'maximum' => ['unit' => 'business_day', 'value' => 5],
                         ],
                     ],
                 ],
             ],
-        ]);
+            'mode' => 'payment',
+
+            'success_url' => route('order.success', ['order_id' => $order->id]),
+            'cancel_url' => route('order.cancel'),
+            'metadata' => [
+                'order_id' => $order->id,
+                'subtotal' => $subtotal,
+                'shipping' => $request->shipping_amount,
+                'discount' => $discountDetails['amount'],
+            ],
+        ];
+
+
+        if ($discountDetails['amount'] > 0) {
+            $couponId = 'COUPON_' . uniqid();
+            try {
+                $coupon = \Stripe\Coupon::create([
+                    'id' => $couponId,
+                    'amount_off' => (int)($discountDetails['amount'] * 100),
+                    'currency' => 'eur',
+                    'name' => $discountDetails['code'],
+                    'duration' => 'forever',
+                ]);
+            } catch (\Stripe\Exception\ApiErrorException $e) {
+                // Handle the error accordingly
+                return response()->json(['error' => 'Failed to create coupon: ' . $e->getMessage()], 500);
+            }
+        }
+        if ($discountDetails['amount'] > 0) {
+            $sessionParams['discounts'] = [
+                [
+                    'coupon' => $couponId,
+                ],
+            ];
+        }
+        $session = Session::create($sessionParams);
         $order->update([
             'session_stripe_id' => $session->id,
         ]);
@@ -122,7 +137,7 @@ class OrderController extends Controller
 
                 // Check the payment status
                 if ($session->payment_status == 'paid') {
-                    // Update order status to completed
+                    // Update order status to processing and payment status to paid
                     $order->update([
                         'payment_status' => 'paid',
                         'status' => 'processing',
@@ -155,23 +170,24 @@ class OrderController extends Controller
         }
         return $total + $shippingAmount;
     }
-    private function prepareLineItems($items, $grandTotal)
+    private function prepareLineItems(array $items): array
     {
-        $lineItems = [];
-        foreach ($items as $item) {
-            $lineItems[] = [
+        return array_map(function ($item) {
+            return [
                 'price_data' => [
                     'currency' => 'eur',
                     'product_data' => [
-                        'name' => 'Order #' . $order->id,
-                        'description' => 'Total amount including shipping' . ($discountAmount > 0 ? ' and discount' : ''),
+                        'name' => $item['name'],
+                        'images' => isset($item['image_url']) ? [$item['image_url']] : [],
+                        'metadata' => [
+                            'product_id' => $item['product_id'],
+                        ],
                     ],
-                    'unit_amount' => (int)($grandTotal * 100),
+                    'unit_amount' => (int)($item['unit_amount'] * 100),
                 ],
-                'quantity' => 1,
+                'quantity' => $item['quantity'],
             ];
-        }
-        return $lineItems;
+        }, $items);
     }
     private function handleFailedPayment(Order $order)
     {
@@ -195,5 +211,24 @@ class OrderController extends Controller
         }
 
         return min($discount->discount_amount, $subtotal);
+    }
+    private function handleDiscount(?string $code, float $subtotal): array
+    {
+        if (!$code) {
+            return ['amount' => 0, 'discount_id' => null];
+        }
+
+        $discount = DiscountCode::where('code', $code)->first();
+
+        if (!$discount || !$discount->isValid() || $subtotal < $discount->minimum_order_value) {
+            return ['amount' => 0, 'discount_id' => null];
+        }
+
+        $discountAmount = $this->calculateDiscountAmount($subtotal, $discount);
+        return [
+            'amount' => $discountAmount,
+            'discount_id' => $discount->id,
+            'code' => $discount->code
+        ];
     }
 }

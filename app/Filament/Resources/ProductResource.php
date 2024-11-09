@@ -88,7 +88,7 @@ class ProductResource extends Resource
                         TextInput::make('base_price')
                             ->required()
                             ->numeric()
-                            ->label('Base Price (USD)'),
+                            ->label('Base Price (Eur)'),
                     ]),
                     Section::make('Sizes and Prices')->schema([
                         Toggle::make('has_sizes')
@@ -105,7 +105,7 @@ class ProductResource extends Resource
                                 TextInput::make('price')
                                     ->required()
                                     ->numeric()
-                                    ->label('Price (USD)'),
+                                    ->label('Price (Eur)'),
                             ])
                             ->columns(2)
                             ->hidden(fn($get) => !$get('has_sizes'))
@@ -168,7 +168,7 @@ class ProductResource extends Resource
                                 '<div class="flex items-center gap-2">
                                     <div class=" bg-primary-50 rounded-md">
                                         <span class="text-sm font-medium">Base Price</span>
-                                        <span class="text-primary-600">$%s</span>
+                                        <span class="text-primary-600">€%s</span>
                                     </div>
                                     %s
                                 </div>',
@@ -182,7 +182,7 @@ class ProductResource extends Resource
                         if ($record->has_sizes && $record->variations->count() > 0) {
                             foreach ($record->variations as $variation) {
                                 $html .= sprintf(
-                                    '<div class="text-sm text-gray-600">%s - $%s</div>',
+                                    '<div class="text-sm text-gray-600">%s - €%s</div>',
                                     $variation->size,
                                     number_format($variation->price, 2)
                                 );

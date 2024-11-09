@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Validation\ValidationException;
-use App\Notifications\ApiResetPasswordNotification;
+use App\Notifications\PasswordResetCodeNotification;
 
 class AuthController extends Controller
 {
@@ -58,39 +58,66 @@ class AuthController extends Controller
     // Forgot password method
     public function forgotPassword(Request $request)
     {
-        $request->validate(['email' => 'required|email']);
+        $request->validate([
+            'email' => 'required|email|exists:users,email'
+        ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if ($user) {
-            $token = Password::createToken($user);
-            $user->notify(new ApiResetPasswordNotification($token));
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
         }
 
-        return response()->json(['message' => 'Password reset link sent.']);
+        // Generate 6-digit code
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Save code and expiration (30 minutes from now)
+        $user->update([
+            'reset_code' => $code,
+            'reset_code_expires_at' => now()->addMinutes(30)
+        ]);
+
+
+        $user->notify(new PasswordResetCodeNotification($code));
+
+        return response()->json([
+            'message' => 'Reset code has been sent to your email.'
+        ]);
     }
 
     // Reset password method
     public function resetPassword(Request $request)
     {
         $request->validate([
-            'token' => 'required',
             'email' => 'required|email',
-            'password' => 'required|string|min:6|confirmed',
+            'code' => 'required|string|size:6',
+            'password' => 'required|string|min:6|confirmed'
         ]);
 
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->password = Hash::make($password);
-                $user->setRememberToken(Str::random(60));
-                $user->save();
-            }
-        );
+        $user = User::where('email', $request->email)->first();
 
-        return $status == Password::PASSWORD_RESET
-            ? response()->json(['message' => 'Password reset successfully.'])
-            : response()->json(['message' => 'Password reset failed.'], 400);
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found.'
+            ], 404);
+        }
+
+        if (!$user->isResetCodeValid($request->code)) {
+            return response()->json([
+                'message' => 'Invalid or expired reset code.'
+            ], 400);
+        }
+
+        // Reset password
+        $user->update([
+            'password' => Hash::make($request->password),
+            'reset_code' => null,
+            'reset_code_expires_at' => null
+        ]);
+
+        return response()->json([
+            'message' => 'Password reset successfully.'
+        ]);
     }
 
     public function redirectToGoogle()

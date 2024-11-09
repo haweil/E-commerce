@@ -22,6 +22,14 @@ class DiscountCode extends Model
     public function isValid(): bool
     {
         $now = now();
-        return $this->is_active && ($this->valid_from <= $now && $this->valid_until >= $now);
+
+        return $this->is_active
+            && $this->valid_from <= $now
+            && $this->valid_until >= $now;
+    }
+
+    public function isApplicable(float $orderAmount): bool
+    {
+        return $orderAmount >= $this->minimum_order_value;
     }
 }

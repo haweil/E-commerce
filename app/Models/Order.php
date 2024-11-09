@@ -29,14 +29,16 @@ class Order extends Model
     {
         return $this->belongsTo(User::class);
     }
-
     public function items()
     {
         return $this->hasMany(OrderItem::class);
     }
-
     public function address()
     {
         return $this->hasOne(Address::class);
+    }
+    public function shipping_amount()
+    {
+        return $this->hasOne(ShippingRate::class);
     }
 }

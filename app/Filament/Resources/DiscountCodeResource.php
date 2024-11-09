@@ -29,7 +29,7 @@ class DiscountCodeResource extends Resource
     {
         return $form
             ->schema([
-                TextInput::make('code')->required()->unique(),
+                TextInput::make('code')->required(),
                 TextInput::make('discount_amount')->numeric()->default(0),
                 TextInput::make('discount_percentage')->numeric()->nullable(),
                 TextInput::make('minimum_order_value')->numeric()->nullable(),

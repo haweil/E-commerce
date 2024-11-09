@@ -95,12 +95,10 @@ class OrderResource extends Resource
                             ]),
                         Select::make('currency')
                             ->options([
-                                'usd' => 'USD',
-                                'inr' => 'INR',
                                 'eur' => 'EUR',
-                                'egp' => 'EGP',
+                                'usd' => 'USD',
                             ])
-                            ->default('usd')
+                            ->default('eur')
                             ->required(),
                         Select::make('shipping_method')
                             ->options(function () {
@@ -242,7 +240,7 @@ class OrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('grand_total')
                     ->numeric()
-                    ->money('usd')
+                    ->money('eur')
                     ->sortable(),
                 TextColumn::make('payment_method')
                     ->searchable()
