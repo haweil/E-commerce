@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\CartController;
 use App\Http\Controllers\APi\ProductController;
 use App\Http\Controllers\APi\CategoryController;
 use App\Http\Controllers\Api\Auth\AuthController;
@@ -30,3 +31,10 @@ Route::prefix('categories')->group(function () {
 });
 Route::get('products', [ProductController::class, 'index']);
 Route::get('product/{id}', [ProductController::class, 'show']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/cart/add', [CartController::class, 'addToCart']);
+    Route::post('/cart/subtract', [CartController::class, 'subtractFromCart']);
+    Route::delete('/cart/remove', [CartController::class, 'removeFromCart']);
+    Route::get('/cart', [CartController::class, 'getCart']);
+});

@@ -71,7 +71,7 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
         // return order data
-        //  $user = $user->with('orders')->find($user->id);
+        $user = $user->with('orders')->find($user->id);
         return response()->json([
             'user' => [
                 'id' => $user->id,
